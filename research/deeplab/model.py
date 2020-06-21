@@ -257,6 +257,7 @@ def multi_scale_logits(images,
       crop_size information.
   """
   # Setup default values.
+  print(model_options)
   if not image_pyramid:
     image_pyramid = [1.0]
   crop_height = (

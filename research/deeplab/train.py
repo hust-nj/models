@@ -209,7 +209,7 @@ flags.DEFINE_integer(
     'Steps to start quantized training. If < 0, will not quantize model.')
 
 # Dataset settings.
-flags.DEFINE_string('dataset', 'pascal_voc_seg',
+flags.DEFINE_string('dataset', 'coco_seg',
                     'Name of the segmentation dataset.')
 
 flags.DEFINE_string('train_split', 'train',
