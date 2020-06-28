@@ -173,6 +173,7 @@ TEST_SET = 'test'
 
 class ModelOptions(
     collections.namedtuple('ModelOptions', [
+        'model_name',
         'outputs_to_num_classes',
         'crop_size',
         'atrous_rates',
@@ -211,6 +212,7 @@ class ModelOptions(
   __slots__ = ()
 
   def __new__(cls,
+              model_name,
               outputs_to_num_classes,
               crop_size=None,
               atrous_rates=None,
@@ -257,7 +259,7 @@ class ModelOptions(
         'nas_remove_os32_stride': FLAGS.nas_remove_os32_stride,
     }
     return super(ModelOptions, cls).__new__(
-        cls, outputs_to_num_classes, crop_size, atrous_rates, output_stride,
+        cls, model_name, outputs_to_num_classes, crop_size, atrous_rates, output_stride,
         preprocessed_images_dtype,
         FLAGS.merge_method,
         FLAGS.add_image_level_feature,
@@ -288,7 +290,8 @@ class ModelOptions(
         FLAGS.batch_norm_decay)
 
   def __deepcopy__(self, memo):
-    return ModelOptions(copy.deepcopy(self.outputs_to_num_classes),
+    return ModelOptions(self.model_name,
+                        copy.deepcopy(self.outputs_to_num_classes),
                         self.crop_size,
                         self.atrous_rates,
                         self.output_stride,

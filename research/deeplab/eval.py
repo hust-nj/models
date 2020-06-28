@@ -86,6 +86,10 @@ flags.DEFINE_integer('max_number_of_evaluations', 0,
                      'Maximum number of eval iterations. Will loop '
                      'indefinitely upon nonpositive values.')
 
+# Model setting.
+flags.DEFINE_string('model_name', 'deeplabv3', 
+                      'The model to be used, support: deeplabv3, nonlocalnowd')
+
 
 def main(unused_argv):
   tf.logging.set_verbosity(tf.logging.INFO)
@@ -112,6 +116,7 @@ def main(unused_argv):
     samples = dataset.get_one_shot_iterator().get_next()
 
     model_options = common.ModelOptions(
+        model_name=FLAGS.model_name,
         outputs_to_num_classes={common.OUTPUT_TYPE: dataset.num_of_classes},
         crop_size=[int(sz) for sz in FLAGS.eval_crop_size],
         atrous_rates=FLAGS.atrous_rates,

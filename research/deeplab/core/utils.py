@@ -18,6 +18,8 @@
 import tensorflow as tf
 from tensorflow.contrib import framework as contrib_framework
 from tensorflow.contrib import slim as contrib_slim
+import math
+
 
 slim = contrib_slim
 
@@ -212,3 +214,127 @@ def get_batch_norm_params(decay=0.9997,
     else:
       raise ValueError('Unsupported sync_batch_norm_method.')
   return batch_norm_params
+
+
+
+def nonLocal2d_nowd(inputs,
+                    filters,
+                    downsample=True,
+                    lr_mult=None,
+                    use_out=False,
+                    out_bn=False,
+                    whiten_type=['in_nostd'],
+                    weight_init_scale=1.0,
+                    with_gc=False,
+                    with_nl=True,
+                    eps=1e-5,
+                    nowd=['nl'],
+                    scope=None):
+  residual = inputs
+  if downsample:
+    inputs = slim.max_pool2d(inputs, 2, stride=2)
+  
+  inputs_shape = inputs.get_shape().as_list()
+  if use_out:
+    # N,H',W',C'
+    value = slim.conv2d(inputs, filters, 1)
+  else:
+    # N,H',W',C'
+    value = slim.conv2d(inputs, inputs_shape[3], 1, biases_initializer=None)
+  
+  value_shape = value.get_shape().as_list()
+  # N, H'xW', C'
+  value = tf.reshape(value, (-1, value_shape[1]*value_shape[2], value_shape[3]))
+
+  out_sim = None
+
+  if with_nl:
+    # N,H,W,C
+    query = slim.conv2d(residual, filters, 1)
+    query_shape = query.get_shape().as_list()
+    # N,HxW,C
+    query = tf.reshape(query, (-1, query_shape[1]*query_shape[2], query_shape[3]))
+
+    # N,H',W',C
+    key = slim.conv2d(inputs, filters, 1)
+    key_shape = key.get_shape().as_list()
+    # N,H'xW',C
+    key = tf.reshape(key, (-1, key_shape[1]*key_shape[2], key_shape[3]))
+
+    if 'in_nostd' in whiten_type:
+        key_mean = tf.reduce_mean(key, axis=1, keepdims=True)
+        query_mean = tf.reduce_mean(query, axis=1, keepdims=True)
+        key -= key_mean
+        query -= query_mean
+    elif 'in' in whiten_type:
+        key_mean, key_var = tf.nn.moments(key, 1, keepdims=True)
+        query_mean, query_var = tf.nn.moments(query, 1, keepdims=True)
+        key -= key_mean
+        query -= query_mean
+        key = key / torch.sqrt(key_var + eps)
+        query = query / torch.sqrt(query_var + eps)
+    elif 'ln_nostd' in whiten_type:
+        key_mean = tf.reduce_mean(key, [1,2], keepdims=True)
+        query_mean = tf.reduce_mean(query, [1,2], keepdims=True)
+        key -= key_mean
+        query -= query_mean
+    elif 'ln' in whiten_type:
+        key_mean, key_var = tf.nn.moments(key, [1,2], keepdims=True)
+        query_mean, query_var = tf.nn.moments(query, [1,2], keepdims=True)
+        key -= key_mean
+        query -= query_mean
+        key = key / torch.sqrt(key_var + eps)
+        query = query / torch.sqrt(query_var + eps)
+    elif 'fln_nostd' in whiten_type :
+        key_mean = tf.reduce_mean(key, [0,1,2], keepdims=True)
+        query_mean = tf.reduce_mean(query, [0,1,2], keepdims=True)
+        key -= key_mean
+        query -= query_mean
+    elif 'fln' in whiten_type:
+        key_mean, key_var = tf.nn.moments(key, [0,1,2], keepdims=True)
+        query_mean, query_var = tf.nn.moments(query, [0,1,2], keepdims=True)
+        key -= key_mean
+        query -= query_mean
+        key = key / torch.sqrt(key_var + eps)
+        query = query / torch.sqrt(query_var + eps)
+
+    # N,HxW,H'xW'
+    sim_map = tf.matmul(query, key, transpose_b=True)
+    ### cancel temp and scale
+    scale = math.sqrt(filters)
+    if 'nl' not in nowd:
+        sim_map = sim_map/scale
+    sim_map = tf.nn.softmax(sim_map, axis=2)
+
+    # [N, H x W, C']
+    out_sim = tf.matmul(sim_map, value)
+    # [N, H, W, C']
+    out_sim = tf.reshape(out_sim, (-1, query_shape[1], query_shape[2], inputs_shape[-1]))
+    gamma = slim.model_variable('gamma', shape=[], initializer=tf.zeros_initializer())
+    out_sim = gamma * out_sim
+
+  if with_gc:
+    # N, H', W', 1
+    mask = slim.conv2d(inputs, 1, 1)
+    mask_shape = mask.get_shape().as_list()
+    # N, H'xW', 1
+    mask = tf.reshape(mask, (-1, mask_shape[1]*mask_shape[2], 1))
+    mask = tf.nn.softmax(mask, axis=1)
+
+    # N, 1, 1, C'
+    out_gc = tf.expand_dims(tf.matmul(mask, value, transpose_a=True),1)
+
+    if out_sim is not None:
+      out_sim = out_sim + out_gc
+    else:
+      out_sim = out_gc
+
+  if use_out:
+    out_sim = slim.conv2d(out_sim, inputs_shape[3], 1, biases_initializer=None)
+  
+  if out_bn:
+    out_sim = slim.batch_norm(out_sim)
+  
+  out = out_sim + residual
+    
+  return out

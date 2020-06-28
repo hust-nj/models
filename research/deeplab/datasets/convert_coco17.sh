@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to download and preprocess the PASCAL VOC 2012 dataset.
+# Script to download and preprocess the COCO 17 dataset.
 #
 # Usage:
 #   bash ./convert_coco17.sh
@@ -10,7 +10,6 @@
 #     - build_data.py
 #     - build_coco17_data.py
 #     - convert_coco17.sh
-#     - remove_gt_colormap.py
 #     + coco_seg
 #       + coco17
 #         + images
@@ -34,7 +33,7 @@ mkdir -p "${OUTPUT_DIR}"
 LIST_FOLDER="${COCO_ROOT}"
 
 echo "Converting coco17 dataset..."
-python3 "${SCRIPT_DIR}/build_coco17_data.py" \
+python "${SCRIPT_DIR}/build_coco17_data.py" \
   --list_folder="${LIST_FOLDER}" \
   --image_format="jpg" \
   --label_format="png" \

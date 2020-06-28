@@ -37,7 +37,7 @@ CURRENT_DIR=$(pwd)
 WORK_DIR="${CURRENT_DIR}/deeplab"
 
 # Run model_test first to make sure the PYTHONPATH is correctly set.
-python "${WORK_DIR}"/model_test.py -v
+# python "${WORK_DIR}"/model_test.py -v
 
 # Go to datasets folder and download PASCAL VOC 2012 segmentation dataset.
 DATASET_DIR="datasets"
@@ -85,7 +85,8 @@ python "${WORK_DIR}"/train.py \
   --fine_tune_batch_norm=true \
   --tf_initial_checkpoint="${INIT_FOLDER}/${CKPT_NAME}/model.ckpt-30000" \
   --train_logdir="${TRAIN_LOGDIR}" \
-  --dataset_dir="${PASCAL_DATASET}"
+  --dataset_dir="${PASCAL_DATASET}" \
+  --dataset=pascal_voc_seg
 
 # Run evaluation. This performs eval over the full val split (1449 images) and
 # will take a while.
@@ -98,7 +99,11 @@ python "${WORK_DIR}"/eval.py \
   --checkpoint_dir="${TRAIN_LOGDIR}" \
   --eval_logdir="${EVAL_LOGDIR}" \
   --dataset_dir="${PASCAL_DATASET}" \
-  --max_number_of_evaluations=1
+  --max_number_of_evaluations=1 \
+  --dataset=pascal_voc_seg
+
+exit
+# TODO 
 
 # Visualize the results.
 python "${WORK_DIR}"/vis.py \

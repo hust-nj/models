@@ -209,13 +209,17 @@ flags.DEFINE_integer(
     'Steps to start quantized training. If < 0, will not quantize model.')
 
 # Dataset settings.
-flags.DEFINE_string('dataset', 'coco_seg',
+flags.DEFINE_string('dataset', 'pascal_voc_seg',
                     'Name of the segmentation dataset.')
 
 flags.DEFINE_string('train_split', 'train',
                     'Which split of the dataset to be used for training')
 
 flags.DEFINE_string('dataset_dir', None, 'Where the dataset reside.')
+
+# Model setting.
+flags.DEFINE_string('model_name', 'deeplabv3', 
+                      'The model to be used, support: deeplabv3, nonlocalnowd')
 
 
 def _build_deeplab(iterator, outputs_to_num_classes, ignore_label):
@@ -235,6 +239,7 @@ def _build_deeplab(iterator, outputs_to_num_classes, ignore_label):
   samples[common.LABEL] = tf.identity(samples[common.LABEL], name=common.LABEL)
 
   model_options = common.ModelOptions(
+      model_name=FLAGS.model_name,
       outputs_to_num_classes=outputs_to_num_classes,
       crop_size=[int(sz) for sz in FLAGS.train_crop_size],
       atrous_rates=FLAGS.atrous_rates,

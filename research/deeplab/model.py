@@ -403,8 +403,66 @@ def extract_features(images,
       nas_architecture_options=model_options.nas_architecture_options,
       nas_training_hyper_parameters=nas_training_hyper_parameters,
       use_bounded_activation=model_options.use_bounded_activation)
+  # print(end_points)
+  print("hello")
+  print(reuse)
+  print(images.get_shape())
+  print(features.get_shape())
+  print(images.get_shape().as_list()[1])
+  print(type(images.get_shape().as_list()[1]))
 
-  if not model_options.aspp_with_batch_norm:
+
+  if model_options.model_name == "nonlocalnowd":
+    batch_norm_params = utils.get_batch_norm_params(
+        decay=0.9997,
+        epsilon=1e-5,
+        scale=True,
+        is_training=(is_training and fine_tune_batch_norm),
+        sync_batch_norm_method=model_options.sync_batch_norm_method)
+    batch_norm = utils.get_batch_norm_fn(
+        model_options.sync_batch_norm_method)
+    activation_fn = (
+        tf.nn.relu6 if model_options.use_bounded_activation else tf.nn.relu)
+
+    # conva 
+    in_channels = features.get_shape()[3]
+    inter_channels = in_channels // 4
+    with slim.arg_scope(
+        [slim.conv2d, slim.separable_conv2d],
+        weights_regularizer=slim.l2_regularizer(weight_decay),
+        activation_fn=activation_fn,
+        normalizer_fn=batch_norm,
+        padding='SAME',
+        stride=1):
+      with slim.arg_scope([batch_norm], **batch_norm_params):
+          output = slim.conv2d(features, inter_channels, 3)
+
+    # ctb
+    output_shape = output.get_shape().as_list()
+    output = utils.nonLocal2d_nowd(output, output_shape[3] // 2)
+
+    with slim.arg_scope(
+        [slim.conv2d, slim.separable_conv2d],
+        weights_regularizer=slim.l2_regularizer(weight_decay),
+        activation_fn=activation_fn,
+        normalizer_fn=batch_norm,
+        padding='SAME'):
+      with slim.arg_scope([batch_norm], **batch_norm_params):
+        output = slim.conv2d(output, output_shape[3], 3)
+
+    # bottleneck
+    with slim.arg_scope(
+        [slim.conv2d, slim.separable_conv2d],
+        weights_regularizer=slim.l2_regularizer(weight_decay),
+        activation_fn=activation_fn,
+        normalizer_fn=batch_norm,
+        padding='SAME'):
+      with slim.arg_scope([batch_norm], **batch_norm_params):
+        output = slim.conv2d(output, 512, 3)
+
+    return output, end_points
+
+  elif not model_options.aspp_with_batch_norm:
     return features, end_points
   else:
     if model_options.dense_prediction_cell_config is not None:
@@ -466,6 +524,7 @@ def extract_features(images,
               image_feature = slim.avg_pool2d(
                   features, [pool_height, pool_width],
                   model_options.image_pooling_stride, padding='VALID')
+              print(image_feature.get_shape())
               resize_height = scale_dimension(
                   model_options.crop_size[0],
                   1. / model_options.output_stride)

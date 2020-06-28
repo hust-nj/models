@@ -25,9 +25,12 @@ DATASET_DIR="datasets"
 # Go back to original directory.
 cd "${CURRENT_DIR}"
 
+# model name
+MODEL_NAME="nonlocalnowd"
+
 # Set up the working directories.
 COCO_FOLDER="coco_seg"
-EXP_FOLDER="exp/train_on_trainval_set"
+EXP_FOLDER="exp/${MODEL_NAME}/train_on_train_set"
 INIT_FOLDER="${WORK_DIR}/${DATASET_DIR}/${COCO_FOLDER}/init_models"
 TRAIN_LOGDIR="${WORK_DIR}/${DATASET_DIR}/${COCO_FOLDER}/${EXP_FOLDER}/train"
 EVAL_LOGDIR="${WORK_DIR}/${DATASET_DIR}/${COCO_FOLDER}/${EXP_FOLDER}/eval"
@@ -53,16 +56,13 @@ cd "${CURRENT_DIR}"
 COCO_DATASET="${WORK_DIR}/${DATASET_DIR}/${COCO_FOLDER}/tfrecord"
 
 # Train 10 iterations.
-NUM_ITERATIONS=100
+NUM_ITERATIONS=10
 python "${WORK_DIR}"/train.py \
   --logtostderr \
   --train_split="train" \
+  --model_name=${MODEL_NAME} \
   --model_variant="mobilenet_v2" \
-  --atrous_rates=6 \
-  --atrous_rates=12 \
-  --atrous_rates=18 \
   --output_stride=16 \
-  --decoder_output_stride=4 \
   --train_crop_size="513,513" \
   --train_batch_size=4 \
   --training_number_of_steps="${NUM_ITERATIONS}" \
@@ -70,4 +70,23 @@ python "${WORK_DIR}"/train.py \
   --tf_initial_checkpoint="${INIT_FOLDER}/$VERSION/$VERSION.ckpt" \
   --train_logdir="${TRAIN_LOGDIR}" \
   --dataset_dir="${COCO_DATASET}" \
-  2>&1 | tee log.txt
+  --dataset=coco_seg \
+  2>&1 | tee log_train.txt
+
+# Run evaluation. This performs eval over the full val split (1449 images) and
+# will take a while.
+# Using the provided checkpoint, one should expect mIOU=75.34%.
+python "${WORK_DIR}"/eval.py \
+  --logtostderr \
+  --eval_split="val" \
+  --model_name=${MODEL_NAME} \
+  --model_variant="mobilenet_v2" \
+  --eval_crop_size="513,513" \
+  --checkpoint_dir="${TRAIN_LOGDIR}" \
+  --eval_logdir="${EVAL_LOGDIR}" \
+  --dataset_dir="${COCO_DATASET}" \
+  --max_number_of_evaluations=1 \
+  --dataset=coco_seg \
+  2>&1 | tee log_eval.txt
+
+# TODO vis, export
